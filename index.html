@@ -18,9 +18,16 @@
     --accent:#7fb0f0; --warn-bg:#3a3010; --warn-fg:#f1d58a; --ok-bg:#16301d; --ok-fg:#9fd8ac; color-scheme:dark }
 }
 *{box-sizing:border-box}
+[hidden]{display:none!important}
 html,body{margin:0}
 body{background:var(--bg);color:var(--fg);font-family:var(--sans);font-size:14px;line-height:1.5}
 
+.lock{min-height:100vh;display:flex;align-items:center;justify-content:center;padding:24px max(16px,env(safe-area-inset-left,0px))}
+.lock-box{width:100%;max-width:360px;background:var(--panel);border:1px solid var(--line);border-radius:10px;padding:24px 22px;display:grid;gap:2px}
+.lock-box .primary{margin-top:14px;padding:9px}
+.lock-box .chk{display:flex;gap:6px;align-items:center;margin-top:10px;color:var(--fg)}
+.lock-box .chk input{width:auto}
+.lock-msg{min-height:1.4em;margin:8px 0 0;font-size:12.5px;color:var(--muted)}
 .app{display:grid;grid-template-columns:minmax(320px,420px) 1fr;min-height:100vh}
 .form{background:var(--panel);border-right:1px solid var(--line);padding:20px 18px 60px;overflow:auto;max-height:100vh;position:sticky;top:0}
 .preview{padding:24px max(16px,2vw) 80px;min-width:0}
@@ -40,6 +47,15 @@ legend{font-weight:700;padding:0 6px;font-size:13.5px}
 label{display:block;font-size:12px;color:var(--muted);margin:8px 0 3px}
 input,select{width:100%;font:inherit;padding:6px 8px;border:1px solid var(--line);border-radius:5px;background:var(--bg);color:var(--fg)}
 .row2{display:grid;grid-template-columns:1fr 1fr;gap:8px}
+.pick-list{max-height:260px;overflow:auto;border:1px solid var(--line);border-radius:6px;margin-top:6px;background:var(--bg)}
+.pick{display:block;width:100%;text-align:left;border:0;border-bottom:1px solid var(--line);border-radius:0;padding:6px 9px;background:transparent}
+.pick:last-child{border-bottom:0}
+.pick:hover{background:var(--panel)}
+.pick b{font-weight:700}
+.pick small{display:block;color:var(--muted);font-size:11.5px}
+.pick .tag{display:inline-block;font-size:11px;padding:0 6px;border-radius:9px;background:var(--warn-bg);color:var(--warn-fg);margin-left:4px}
+.pick[disabled]{opacity:.45;cursor:default}
+.pick-empty{padding:10px;color:var(--muted);font-size:12.5px}
 .item{border:1px dashed var(--line);border-radius:6px;padding:4px 8px 8px;margin-top:8px;position:relative}
 .item .del{position:absolute;right:6px;top:6px;padding:1px 8px;font-size:12px}
 .note{font-size:12px;border-radius:6px;padding:8px 10px;margin-top:10px}
@@ -156,7 +172,7 @@ details td,details th{border:1px solid var(--line);padding:3px 5px;text-align:le
   @page b63{size:600mm 300mm;margin:0}
   @page b64{size:600mm 450mm;margin:0}
   body{background:#fff}
-  .form,.sec-title,.wrap.off{display:none!important}
+  .form,.sec-title,.wrap.off,.lock{display:none!important}
   .app{display:block}
   .preview{padding:0}
   .wrap{box-shadow:none;width:auto!important;height:auto!important;overflow:visible}
@@ -166,13 +182,25 @@ details td,details th{border:1px solid var(--line);padding:3px 5px;text-align:le
 </style>
 </head>
 <body>
-<div class="app">
+<div id="lock" class="lock">
+  <form id="lockForm" class="lock-box">
+    <h1>저장소 부착물 제작기</h1>
+    <p class="sub">관계자 전용입니다. 공유받은 암호를 입력하세요.</p>
+    <label for="lockPw">암호</label>
+    <input id="lockPw" type="password" autocomplete="current-password" required autofocus>
+    <label class="chk"><input id="lockRemember" type="checkbox"> 이 기기에서 암호 기억하기</label>
+    <button class="primary" type="submit">열기</button>
+    <p id="lockMsg" class="lock-msg" role="status"></p>
+  </form>
+</div>
+<div class="app" id="app" hidden>
 <aside class="form" id="form">
   <h1>저장소 부착물 제작기</h1>
-  <p class="sub">이산화탄소 보관함 · 유류저장소 (산업안전보건법 / 위험물안전관리법)</p>
+  <p class="sub">가스 보관함 · 위험물저장소 (산업안전보건법 / 위험물안전관리법)</p>
   <div class="printbar">
     <button class="primary" id="btnPrint" type="button">인쇄 / PDF 저장</button>
     <button id="btnReset" type="button">예시값으로 초기화</button>
+    <button id="btnLogout" type="button">잠그기</button>
   </div>
 
   <fieldset>
@@ -212,7 +240,7 @@ details td,details th{border:1px solid var(--line);padding:3px 5px;text-align:le
   </fieldset>
 
   <fieldset>
-    <legend>유류저장소</legend>
+    <legend>위험물저장소</legend>
     <label for="oilType">저장소 구분 (표지 문구)</label>
     <select id="oilType">
       <option>위험물 옥내저장소</option>
@@ -235,12 +263,19 @@ details td,details th{border:1px solid var(--line);padding:3px 5px;text-align:le
     </div>
 
     <label style="margin-top:12px">저장 물질 (여러 개 가능)</label>
+    <div id="chemStatus" class="sub" style="margin:0 0 4px">chemicare 화학물질 목록을 불러오는 중…</div>
+    <div class="row2">
+      <div><label for="chemVendor" style="margin-top:0">업체</label><select id="chemVendor"><option value="">전체 업체</option></select></div>
+      <div><label for="chemSearch" style="margin-top:0">검색</label><input id="chemSearch" type="search" placeholder="제품명·제조사"></div>
+    </div>
+    <div id="chemPick" class="pick-list" hidden></div>
+    <p class="sub" style="margin:4px 0 8px">목록에서 누르면 아래에 추가됩니다. 목록에 없는 물질은 맨 아래 [+ 물질 추가]로 직접 입력하세요.</p>
     <div id="items"></div>
     <button type="button" id="btnAdd" style="margin-top:8px;width:100%">+ 물질 추가</button>
     <div id="calcNote"></div>
 
     <details>
-      <summary>제4류 위험물 품명 · 지정수량 참고</summary>
+      <summary>위험물 품명 · 지정수량 참고</summary>
       <table>
         <tr><th>품명</th><th>지정수량</th><th>예</th></tr>
         <tr><td>특수인화물</td><td>50L</td><td>디에틸에테르, 이황화탄소</td></tr>
@@ -250,6 +285,7 @@ details td,details th{border:1px solid var(--line);padding:3px 5px;text-align:le
         <tr><td>제3석유류 비수용성/수용성</td><td>2,000L / 4,000L</td><td>중유, 크레오소트유 / 에틸렌글리콜, 글리세린</td></tr>
         <tr><td>제4석유류</td><td>6,000L</td><td>기어유, 실린더유 (인화점 200~250℃ 미만)</td></tr>
         <tr><td>동식물유류</td><td>10,000L</td><td>아마인유, 들기름 등</td></tr>
+        <tr><td>제2류 인화성고체</td><td>1,000kg</td><td>고형 알코올, 락카퍼티 등</td></tr>
       </table>
       <p>윤활유·엔진오일은 제품 MSDS의 인화점을 확인하세요. 인화점 250℃ 이상이면 위험물에서 제외됩니다.</p>
     </details>
@@ -272,8 +308,121 @@ const CATS = {
   p3w: {label:'제3석유류(수용성)', limit:4000, grade:'Ⅲ'},
   p4:  {label:'제4석유류', limit:6000, grade:'Ⅲ'},
   an:  {label:'동식물유류', limit:10000, grade:'Ⅲ'},
+  f2:  {label:'인화성고체', limit:1000, grade:'Ⅲ', unit:'kg', cls:'제2류'},
   na:  {label:'위험물 아님(인화점 250℃ 이상 등)', limit:null, grade:'-'}
 };
+Object.values(CATS).forEach(c => { c.unit ||= 'L'; c.cls ||= '제4류'; });
+const CLS_LABEL = {'제4류':'제4류 (인화성 액체)', '제2류':'제2류 (가연성 고체)'};
+
+/* ───── chemicare 화학물질 목록 (GitHub Actions가 주기적으로 갱신) ───── */
+const CHEM_URLS = ['https://raw.githubusercontent.com/2022sk/storage-signs/main/chemicals.enc.json', 'chemicals.enc.json'];
+let CHEM = null;
+const chemById = id => CHEM && id != null ? CHEM.byId[id] : null;
+const itemName = it => chemById(it.cid)?.name || it.name;
+
+// MSDS의 위험물 분류 문구를 품명 코드로 바꾼다. 수용성 여부를 알 수 없으면 sure=false
+function catFromHazmat(h, lim){
+  h = h || ''; lim = lim || '';
+  if (/해당\s*(없|하지|되지)|분류되지\s*않|규제되지/.test(h)) return ['na', true];
+  if (/인화성\s*고체/.test(h)) return ['f2', true];
+  if (/특수인화물/.test(h)) return ['sp', true];
+  if (/알코올류/.test(h)) return ['al', true];
+  if (/동식물유/.test(h)) return ['an', true];
+  const m = h.match(/([1-4])\s*석유류/);
+  if (!m) return [null, false];
+  if (m[1] === '4') return ['p4', true];
+  const sol = t => /(^|[^비])수용성/.test(t), insol = t => /비수용성/.test(t);
+  let w = null;
+  if (insol(h)) w = false; else if (sol(h)) w = true;
+  else if (insol(lim) && !sol(lim)) w = false; else if (sol(lim) && !insol(lim)) w = true;
+  return ['p' + m[1] + (w ? 'w' : 'n'), w !== null];
+}
+
+// 위험물로 분류된 물질만 목록에 띄운다 (해당없음·자료없음·빈칸 제외)
+const isHazmat = c => c.hazmat && !/자료\s*없음/.test(c.hazmat) && catFromHazmat(c.hazmat, c.limit)[0] !== 'na';
+function fillChemList(){
+  if (!CHEM) return;
+  const v = $('chemVendor').value, q = $('chemSearch').value.trim().toLowerCase();
+  const added = new Set(S.items.map(it => it.cid).filter(Boolean));
+  const seen = new Set();
+  const list = CHEM.items
+    .filter(isHazmat)
+    .filter(c => !v || c.vendor === v)
+    .filter(c => !q || (c.name + ' ' + c.maker).toLowerCase().includes(q))
+    .filter(c => !seen.has(c.name) && seen.add(c.name));
+  const box = $('chemPick');
+  box.hidden = false;
+  box.innerHTML = list.length ? list.map(c => {
+    const [cat] = catFromHazmat(c.hazmat, c.limit);
+    const on = added.has(c.id) || S.items.some(it => it.name === c.name);
+    return `<button type="button" class="pick" data-pick="${c.id}" ${on ? 'disabled' : ''}>
+      <b>${esc(c.name)}</b>${on ? '<span class="tag">추가됨</span>' : ''}${cat ? '' : '<span class="tag">품명 확인</span>'}
+      <small>${esc(c.hazmat)}${v ? '' : ' · ' + esc(c.vendor)}</small></button>`;
+  }).join('') : '<div class="pick-empty">조건에 맞는 위험물이 없습니다.</div>';
+}
+function addChem(id){
+  const c = chemById(id);
+  if (!c) return;
+  const [cat, sure] = catFromHazmat(c.hazmat, c.limit);
+  S.items.push({name:c.name, cid:c.id, cat:cat || 'p1n', qty:0, unsure:!cat || !sure});
+  save(); renderItems(); render(); fillChemList();
+}
+// 암호화된 목록을 받아 암호로 푼다. 암호가 틀리면 예외가 난다
+async function decryptList(pw, enc){
+  const b64 = s => Uint8Array.from(atob(s), c => c.charCodeAt(0));
+  const base = await crypto.subtle.importKey('raw', new TextEncoder().encode(pw), 'PBKDF2', false, ['deriveKey']);
+  const key = await crypto.subtle.deriveKey({name:'PBKDF2', salt:b64(enc.salt), iterations:enc.iter, hash:'SHA-256'},
+    base, {name:'AES-GCM', length:256}, false, ['decrypt']);
+  const plain = await crypto.subtle.decrypt({name:'AES-GCM', iv:b64(enc.iv)}, key, b64(enc.data));
+  return JSON.parse(new TextDecoder().decode(plain));
+}
+async function fetchEncrypted(){
+  for (const url of CHEM_URLS) {
+    try {
+      const r = await fetch(url + '?t=' + Date.now(), {cache:'no-store'});
+      if (r.ok) return await r.json();
+    } catch (e) {}
+  }
+  return null;
+}
+function useChemicals(d){
+  CHEM = {...d, byId: Object.fromEntries(d.items.map(c => [c.id, c]))};
+  const n = new Set(CHEM.items.map(c => c.name)).size;
+  const nh = new Set(CHEM.items.filter(isHazmat).map(c => c.name)).size;
+  $('chemStatus').textContent = `chemicare 위험물 ${nh}종 (전체 ${n}종) · ${CHEM.updated} 기준`;
+  const vendors = [...new Set(CHEM.items.map(c => c.vendor).filter(Boolean))].sort();
+  $('chemVendor').innerHTML = '<option value="">전체 업체</option>' + vendors.map(v => `<option>${esc(v)}</option>`).join('');
+  fillChemList();
+  // 저장해 둔 물질의 이름이 chemicare에서 바뀌었으면 새 이름으로 맞춘다
+  S.items.forEach(it => { const c = chemById(it.cid); if (c) it.name = c.name; });
+  save(); renderItems(); render();
+}
+
+/* ───── 암호 화면 ───── */
+const PW_KEY = 'storage-signs-pw';
+const getStored = () => { try { return sessionStorage.getItem(PW_KEY) || localStorage.getItem(PW_KEY); } catch (e) { return null; } };
+function storePw(pw, remember){
+  try { sessionStorage.setItem(PW_KEY, pw); if (remember) localStorage.setItem(PW_KEY, pw); } catch (e) {}
+}
+function forgetPw(){ try { sessionStorage.removeItem(PW_KEY); localStorage.removeItem(PW_KEY); } catch (e) {} }
+
+async function unlock(pw, remember){
+  const msg = $('lockMsg');
+  msg.textContent = '확인 중…';
+  const enc = await fetchEncrypted();
+  if (!enc) { msg.textContent = '목록 파일이 아직 준비되지 않았습니다. 관리자에게 문의하세요.'; return false; }
+  let d;
+  try { d = await decryptList(pw, enc); }
+  catch (e) { msg.textContent = '암호가 맞지 않습니다.'; forgetPw(); return false; }
+  storePw(pw, remember);
+  $('lock').hidden = true;
+  $('app').hidden = false;
+  loadForm(); render();
+  useChemicals(d);
+  document.fonts?.ready.then(render);
+  return true;
+}
+
 const DEFAULT = {
   company:'(주)○○산업', inhouse:'안전관리팀 031-000-0000',
   gas:'co2', gasName:'', gasType:'inert', co2Place:'out', co2Loc:'제1공장 동측 옥외 가스보관함', co2Spec:'20kg (47L)', co2Full:'3', co2Empty:'1',
@@ -438,10 +587,10 @@ function sheetBoard(){
   const fs = n <= 4 ? 15 : n <= 6 ? 12.5 : n <= 8 ? 10 : 8;
   const body = rows.length ? rows.map(i => {
     const c = CATS[i.cat];
-    return `<tr><td class="l">${esc(c.label)}</td><td class="l"><b>${esc(i.name)}</b></td><td>${c.grade}</td><td>${num(i.qty)} L</td><td>${num(c.limit)} L</td><td>${fmtX((Number(i.qty)||0)/c.limit)}</td></tr>`;
+    return `<tr><td class="l">${esc(c.label)}</td><td class="l"><b>${esc(itemName(i))}</b></td><td>${c.grade}</td><td>${num(i.qty)} ${c.unit}</td><td>${num(c.limit)} ${c.unit}</td><td>${fmtX((Number(i.qty)||0)/c.limit)}</td></tr>`;
   }).join('') : `<tr><td colspan="6">저장 물질을 입력하세요</td></tr>`;
   return `<div class="sheet b64"><div class="board" style="font-size:${fs}mm">
-    <div class="top"><div>유별 : 제4류 위험물 (인화성 액체)</div><div>${esc(S.company)}</div></div>
+    <div class="top"><div>유별 : ${[...new Set(rows.map(i => CATS[i.cat].cls))].map(k => CLS_LABEL[k]).join(' · ') || '-'}</div><div>${esc(S.company)}</div></div>
     <table><tr><th>품 명</th><th>물질명</th><th>위험등급</th><th>저장최대수량</th><th>지정수량</th><th>배수</th></tr>${body}</table>
     <div class="sum">
       <div><div class="k">지정수량의 배수 (합계)</div><div class="v">${fmtX(total)} 배</div></div>
@@ -469,12 +618,12 @@ function sheetRules(){
     ['눈', '흐르는 물로 15분 이상 씻기']
   ];
   const rows = S.items.filter(i => i.name || i.qty).map(i =>
-    `<tr><td><b>${esc(i.name)}</b></td><td>${esc(CATS[i.cat]?.label || '')}</td><td class="r">${num(i.qty)} L</td></tr>`).join('');
+    `<tr><td><b>${esc(itemName(i))}</b></td><td>${esc(CATS[i.cat]?.label || '')}</td><td class="r">${num(i.qty)} ${CATS[i.cat]?.unit || 'L'}</td></tr>`).join('');
   return `<div class="sheet a3"><div class="a4 a4in"><div class="in">
     ${mgrBlock(S.oilM1,S.oilT1,S.oilM2,S.oilT2)}
     <div class="gas">
-      <div class="gn" style="font-size:22mm">유류저장소</div>
-      <div class="gs">제4류 위험물 · 인화성 액체<span class="sig">신호어 : 위 험</span></div>
+      <div class="gn" style="font-size:22mm">위험물저장소</div>
+      <div class="gs"><span class="sig" style="margin:0">신호어 : 위 험</span></div>
     </div>
     <div class="band">화기엄금 · 흡연금지 · 점화원 반입금지</div>
     <table class="stab">
@@ -493,10 +642,10 @@ function sheetRules(){
 
 const SHEETS = [
   {id:'co2',  title:'① 가스 보관함 부착물', size:'A3 (297×420mm)', w:297, h:420, fn:sheetCO2},
-  {id:'plate',title:'② 유류저장소 표지', size:'600×300mm · 백색바탕 흑색문자', w:600, h:300, fn:sheetPlate},
+  {id:'plate',title:'② 위험물저장소 표지', size:'600×300mm · 백색바탕 흑색문자', w:600, h:300, fn:sheetPlate},
   {id:'fire', title:'③ 주의사항 게시판', size:'600×300mm · 적색바탕 백색문자', w:600, h:300, fn:sheetFire},
   {id:'board',title:'④ 위험물 게시판', size:'600×450mm · 유별·품명·최대수량·배수·안전관리자', w:600, h:450, fn:sheetBoard},
-  {id:'rules',title:'⑤ 유류저장소 안전수칙', size:'A3 (297×420mm)', w:297, h:420, fn:sheetRules}
+  {id:'rules',title:'⑤ 위험물저장소 안전수칙', size:'A3 (297×420mm)', w:297, h:420, fn:sheetRules}
 ];
 const MM = 96/25.4;
 
@@ -535,16 +684,23 @@ function fit(){
   });
 }
 
+function itemHint(it){
+  const c = chemById(it.cid);
+  if (!c) return '';
+  const src = esc(c.hazmat || '위험물 분류 정보 없음');
+  return it.unsure ? `MSDS: ${src} — 품명을 확인해 골라주세요` : `MSDS: ${src}`;
+}
 function renderItems(){
-  const opts = Object.entries(CATS).map(([k,c]) => `<option value="${k}">${c.label}${c.limit?` · ${num(c.limit)}L`:''}</option>`).join('');
+  const opts = Object.entries(CATS).map(([k,c]) => `<option value="${k}">${c.cls === '제4류' ? '' : c.cls + ' '}${c.label}${c.limit?` · ${num(c.limit)}${c.unit}`:''}</option>`).join('');
   $('items').innerHTML = S.items.map((it,i) => `
     <div class="item">
       <button type="button" class="del" data-del="${i}" aria-label="삭제">삭제</button>
       <div class="row2">
         <div><label for="in${i}">물질명</label><input id="in${i}" data-i="${i}" data-k="name" value="${esc(it.name)}"></div>
-        <div><label for="iq${i}">최대저장수량 (L)</label><input id="iq${i}" type="number" min="0" data-i="${i}" data-k="qty" value="${esc(it.qty)}"></div>
+        <div><label for="iq${i}" id="iu${i}">최대저장수량 (${CATS[it.cat]?.unit || 'L'})</label><input id="iq${i}" type="number" min="0" data-i="${i}" data-k="qty" value="${esc(it.qty)}"></div>
       </div>
       <label for="ic${i}">품명</label><select id="ic${i}" data-i="${i}" data-k="cat">${opts}</select>
+      <div class="sub" id="ih${i}" style="margin:4px 0 0">${itemHint(it)}</div>
     </div>`).join('');
   S.items.forEach((it,i) => { $('ic'+i).value = it.cat; });
 }
@@ -557,12 +713,28 @@ function loadForm(){
 
 $('form').addEventListener('input', e => {
   const t = e.target;
-  if (t.dataset.k) { const it = S.items[t.dataset.i]; it[t.dataset.k] = t.dataset.k==='qty' ? Number(t.value) : t.value; }
+  if (t.id === 'chemVendor' || t.id === 'chemSearch') { fillChemList(); return; }
+  if (t.dataset.k) {
+    const i = t.dataset.i, it = S.items[i];
+    it[t.dataset.k] = t.dataset.k==='qty' ? Number(t.value) : t.value;
+    if (t.dataset.k === 'name') {
+      const v = $('chemVendor').value;
+      const c = CHEM?.items.find(c => c.name === t.value && (!v || c.vendor === v)) || CHEM?.items.find(c => c.name === t.value);
+      it.cid = c ? c.id : null; it.unsure = false;
+      if (c) { const [cat, sure] = catFromHazmat(c.hazmat, c.limit); if (cat) { it.cat = cat; $('ic'+i).value = cat; } it.unsure = !sure; }
+    }
+    if (t.dataset.k === 'cat') it.unsure = false;
+    $('ih'+i).textContent = '';
+    $('ih'+i).innerHTML = itemHint(it);
+    $('iu'+i).textContent = `최대저장수량 (${CATS[it.cat]?.unit || 'L'})`;
+  }
   else if (FIELDS.includes(t.id)) { S[t.id] = t.value; if (t.id==='oilType') $('oilTypeCustom').hidden = t.value!=='custom'; if (t.id==='gas') $('gasCustomBox').hidden = t.value!=='custom'; }
   save(); render();
 });
 $('form').addEventListener('click', e => {
-  if (e.target.dataset.del !== undefined) { S.items.splice(+e.target.dataset.del,1); renderItems(); save(); render(); }
+  const pk = e.target.closest('[data-pick]');
+  if (pk && !pk.disabled) { addChem(+pk.dataset.pick); return; }
+  if (e.target.dataset.del !== undefined) { S.items.splice(+e.target.dataset.del,1); renderItems(); save(); render(); fillChemList(); }
 });
 $('btnAdd').onclick = () => { S.items.push({name:'', cat:'p2n', qty:0}); renderItems(); save(); render(); };
 $('btnReset').onclick = () => { S = structuredClone(DEFAULT); save(); loadForm(); render(); };
@@ -571,8 +743,13 @@ $('preview').addEventListener('change', e => {
   if (e.target.dataset.on) { S.on[e.target.dataset.on] = e.target.checked; save(); render(); }
 });
 window.addEventListener('resize', fit);
-loadForm(); render();
-document.fonts?.ready.then(render);
+$('lockForm').addEventListener('submit', e => {
+  e.preventDefault();
+  unlock($('lockPw').value, $('lockRemember').checked);
+});
+$('btnLogout').onclick = () => { forgetPw(); location.reload(); };
+const savedPw = getStored();
+if (savedPw) unlock(savedPw, false);
 </script>
 </body>
 </html>
