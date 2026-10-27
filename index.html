@@ -119,6 +119,10 @@ details td,details th{border:1px solid var(--line);padding:3px 5px;text-align:le
 .aidl>div{display:flex;align-items:stretch;border:.6mm solid #000}
 .aidl b{flex:none;width:4em;background:#000;color:#fff;display:flex;align-items:center;justify-content:center;font-weight:800;padding:.3em 0}
 .aidl span{padding:.3em .6em;font-weight:700}
+.stab{width:100%;border-collapse:collapse;font-size:4.8mm;border-bottom:1mm solid #000}
+.stab th,.stab td{border-bottom:.35mm solid #000;padding:1.6mm 4mm;text-align:left}
+.stab th{background:#efefef;font-size:.85em}
+.stab .r{text-align:right;font-variant-numeric:tabular-nums}
 .msds{margin:2mm 0 0;font-size:3.6mm;color:#333}
 .blk h3{margin:0 0 1.4mm;font-size:5.4mm;font-weight:900}
 .blk ol,.blk ul{margin:0;padding-left:5.5mm;font-size:4.5mm;line-height:1.45}
@@ -174,7 +178,6 @@ details td,details th{border:1px solid var(--line);padding:3px 5px;text-align:le
   <fieldset>
     <legend>공통</legend>
     <label for="company">업체명</label><input id="company">
-    <label for="inhouse">사내 비상연락처</label><input id="inhouse">
   </fieldset>
 
   <fieldset>
@@ -222,7 +225,6 @@ details td,details th{border:1px solid var(--line);padding:3px 5px;text-align:le
       <option value="custom">직접 입력</option>
     </select>
     <input id="oilTypeCustom" placeholder="표지 문구 직접 입력" hidden style="margin-top:6px">
-    <label for="oilLoc">저장소 위치</label><input id="oilLoc">
     <div class="row2">
       <div><label for="oilM1">위험물안전관리자(정)</label><input id="oilM1"></div>
       <div><label for="oilT1">연락처</label><input id="oilT1"></div>
@@ -286,7 +288,7 @@ const DEFAULT = {
   ],
   on:{co2:true, plate:true, fire:true, board:true, rules:true}
 };
-const FIELDS = ['company','inhouse','gas','gasName','gasType','co2Place','co2M1','co2T1','co2M2','co2T2','oilType','oilTypeCustom','oilLoc','oilM1','oilT1','oilM2','oilT2'];
+const FIELDS = ['company','gas','gasName','gasType','co2Place','co2M1','co2T1','co2M2','co2T2','oilType','oilTypeCustom','oilM1','oilT1','oilM2','oilT2'];
 const KEY = 'storage-sign-maker-v1';
 let S;
 try { S = JSON.parse(localStorage.getItem(KEY)) } catch(e) {}
@@ -449,32 +451,44 @@ function sheetBoard(){
 }
 
 function sheetRules(){
-  const list = S.items.map(i => `${esc(i.name)} (${esc(CATS[i.cat]?.label||'')}, ${num(i.qty)}L)`).join(' · ');
-  return `<div class="sheet a4"><div class="in">
-    <div class="head">
-      <div><h2>유류저장소</h2><div class="nm">관계자 외 출입금지</div><span class="sig">신호어 : 위 험</span></div></div>
-    <div class="band">화기 · 흡연 · 점화원 반입 금지 &nbsp;|&nbsp; 인화성 액체 경고</div>
+  const tips = [
+    [true,  '흡연 · 화기 사용 금지'],
+    [true,  '불꽃 나는 공구 사용 금지'],
+    [false, '용기는 항상 밀폐'],
+    [false, '옮겨 담을 때 접지 (정전기 방지)'],
+    [false, '저장소 상시 환기'],
+    [false, '물질별 구분 · 표시 보관'],
+    [false, '소화기 위치 확인 · 통로 확보'],
+    [false, '보호구 착용 (장갑 · 보안경)'],
+    [true,  '관계자 외 출입 금지']
+  ];
+  const aid = [
+    ['누유', '흡착포 · 모래로 확산 차단 → 배수로 유입 막기'],
+    ['화재', '분말 · CO₂ · 포 소화기 사용 (물 직접 주수 금지)'],
+    ['피부', '오염된 옷 벗고 물과 비누로 씻기'],
+    ['눈', '흐르는 물로 15분 이상 씻기']
+  ];
+  const rows = S.items.filter(i => i.name || i.qty).map(i =>
+    `<tr><td><b>${esc(i.name)}</b></td><td>${esc(CATS[i.cat]?.label || '')}</td><td class="r">${num(i.qty)} L</td></tr>`).join('');
+  return `<div class="sheet a3"><div class="a4 a4in"><div class="in">
     ${mgrBlock(S.oilM1,S.oilT1,S.oilM2,S.oilT2)}
-    <table class="kv">
-      <tr><th>저장소 위치</th><td>${esc(S.oilLoc)}</td></tr>
-      <tr><th>저장 물질</th><td style="font-size:3.8mm">${list || '-'}</td></tr>
+    <div class="gas">
+      <div class="gn" style="font-size:22mm">유류저장소</div>
+      <div class="gs">제4류 위험물 · 인화성 액체<span class="sig">신호어 : 위 험</span></div>
+    </div>
+    <div class="band">화기엄금 · 흡연금지 · 점화원 반입금지</div>
+    <table class="stab">
+      <tr><th>물질명</th><th>품명</th><th class="r">최대저장량</th></tr>
+      ${rows || '<tr><td colspan="3">저장 물질을 입력하세요</td></tr>'}
     </table>
-    <div class="blk"><h3>안전 수칙</h3><ol>
-      <li>저장소 내 및 주변에서 흡연·화기 사용 금지, 불꽃·스파크가 생기는 공구 사용 금지</li>
-      <li>용기는 항상 밀폐하고, 옮겨 담을 때는 접지하여 정전기를 방지할 것</li>
-      <li>저장소는 상시 환기하고, 저장 물질별로 구분·표시하여 보관할 것</li>
-      <li>누유 시 흡착포·모래로 확산을 막고 하수구·배수로 유입을 차단할 것</li>
-      <li>소화기 등 소화설비 위치를 확인하고 통로에 물건을 두지 말 것</li>
-      <li>저장 물질의 물질안전보건자료(MSDS)를 게시·비치하고 취급자에게 교육할 것</li>
-      <li>보호구(내화학 장갑, 보안경)를 착용하고 취급할 것</li>
-    </ol></div>
-    <div class="blk"><h3>화재 · 누출 시</h3><ul>
-      <li>즉시 주변에 알리고 119 신고, 초기 화재는 분말·이산화탄소·포 소화기로 진화 (물 직접 주수 금지)</li>
-      <li>피부 접촉 시 오염된 옷을 벗고 물과 비누로 씻을 것, 눈에 들어가면 15분 이상 흐르는 물로 세척</li>
-    </ul></div>
-    <div class="foot"><div class="em">☎ 119</div><div><b>사내 비상연락</b><br>${esc(S.inhouse)}</div></div>
-    <div class="law">근거: 산업안전보건법 제37조(안전보건표지)·제114조(MSDS 게시)·시행규칙 별표 6·7, 위험물안전관리법 시행규칙 별표 4 Ⅲ(표지 및 게시판)</div>
-  </div></div>`;
+    <div class="blk"><h3>취급 · 보관 수칙</h3>
+      <div class="tiles">${tips.map(([no, t]) => `<div class="tile${no ? ' no' : ''}"><i></i>${t}</div>`).join('')}</div>
+    </div>
+    <div class="blk"><h3>응급조치</h3>
+      <div class="aidl">${aid.map(([k, v]) => `<div><b>${k}</b><span>${v}</span></div>`).join('')}</div>
+      <p class="msds">자세한 내용은 비치된 물질안전보건자료(MSDS)를 확인하세요.</p>
+    </div>
+  </div></div></div>`;
 }
 
 const SHEETS = [
@@ -482,7 +496,7 @@ const SHEETS = [
   {id:'plate',title:'② 유류저장소 표지', size:'600×300mm · 백색바탕 흑색문자', w:600, h:300, fn:sheetPlate},
   {id:'fire', title:'③ 주의사항 게시판', size:'600×300mm · 적색바탕 백색문자', w:600, h:300, fn:sheetFire},
   {id:'board',title:'④ 위험물 게시판', size:'600×450mm · 유별·품명·최대수량·배수·안전관리자', w:600, h:450, fn:sheetBoard},
-  {id:'rules',title:'⑤ 유류저장소 안전수칙', size:'A4 (210×297mm) · 산안법 표지', w:210, h:297, fn:sheetRules}
+  {id:'rules',title:'⑤ 유류저장소 안전수칙', size:'A3 (297×420mm)', w:297, h:420, fn:sheetRules}
 ];
 const MM = 96/25.4;
 
@@ -504,7 +518,7 @@ function render(){
 // A4 부착물 내용이 넘치면 수칙 글자를 조금씩 줄여 한 장에 맞춘다
 function shrinkToFit(){
   document.querySelectorAll('.a4 .in').forEach(box => {
-    const els = [...box.querySelectorAll('.blk ol, .blk ul, .tiles, .aidl')];
+    const els = [...box.querySelectorAll('.blk ol, .blk ul, .tiles, .aidl, .stab')];
     const base = els.map(e => parseFloat(getComputedStyle(e).fontSize));
     for (let k = 0.98; box.scrollHeight > box.clientHeight && k > 0.55; k -= 0.02)
       els.forEach((e, n) => { e.style.fontSize = base[n] * k + 'px'; });
