@@ -1,0 +1,564 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>저장소 부착물 제작기</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/moonspam/NanumSquare@2.0/nanumsquare.css">
+<style>
+/* 레이아웃: 왼쪽 입력 패널 + 오른쪽 실물 비율 미리보기. 인쇄 시 미리보기만 실제 크기로 출력 */
+:root{
+  --bg:#eef0f2; --panel:#ffffff; --fg:#1d2126; --muted:#5f6873; --line:#d5d9de;
+  --accent:#1f4e8c; --warn-bg:#fff6dc; --warn-fg:#6b4d00; --ok-bg:#e7f3ea; --ok-fg:#1f5a2e;
+  --sans:"NanumSquare","NanumSquareOTF","나눔스퀘어","Malgun Gothic","Apple SD Gothic Neo",sans-serif;
+}
+@media (prefers-color-scheme: dark){
+  :root{ --bg:#16191d; --panel:#1f2328; --fg:#e7eaee; --muted:#9aa3ad; --line:#353b42;
+    --accent:#7fb0f0; --warn-bg:#3a3010; --warn-fg:#f1d58a; --ok-bg:#16301d; --ok-fg:#9fd8ac; color-scheme:dark }
+}
+*{box-sizing:border-box}
+html,body{margin:0}
+body{background:var(--bg);color:var(--fg);font-family:var(--sans);font-size:14px;line-height:1.5}
+
+.app{display:grid;grid-template-columns:minmax(320px,420px) 1fr;min-height:100vh}
+.form{background:var(--panel);border-right:1px solid var(--line);padding:20px 18px 60px;overflow:auto;max-height:100vh;position:sticky;top:0}
+.preview{padding:24px max(16px,2vw) 80px;min-width:0}
+@media (max-width:860px){
+  .app{grid-template-columns:1fr}
+  .form{position:static;max-height:none;border-right:0;border-bottom:1px solid var(--line)}
+}
+h1{font-size:20px;margin:0 0 4px;font-weight:900;letter-spacing:-.02em}
+.sub{color:var(--muted);font-size:12.5px;margin:0 0 14px}
+.printbar{display:flex;gap:8px;flex-wrap:wrap;margin-bottom:16px}
+button{font:inherit;cursor:pointer;border-radius:6px;border:1px solid var(--line);background:var(--panel);color:var(--fg);padding:7px 12px}
+button.primary{background:var(--accent);border-color:var(--accent);color:#fff;font-weight:700}
+@media (prefers-color-scheme: dark){ button.primary{color:#0d1520} }
+button:focus-visible,input:focus-visible,select:focus-visible{outline:2px solid var(--accent);outline-offset:1px}
+fieldset{border:1px solid var(--line);border-radius:8px;margin:0 0 14px;padding:10px 12px 12px}
+legend{font-weight:700;padding:0 6px;font-size:13.5px}
+label{display:block;font-size:12px;color:var(--muted);margin:8px 0 3px}
+input,select{width:100%;font:inherit;padding:6px 8px;border:1px solid var(--line);border-radius:5px;background:var(--bg);color:var(--fg)}
+.row2{display:grid;grid-template-columns:1fr 1fr;gap:8px}
+.item{border:1px dashed var(--line);border-radius:6px;padding:4px 8px 8px;margin-top:8px;position:relative}
+.item .del{position:absolute;right:6px;top:6px;padding:1px 8px;font-size:12px}
+.note{font-size:12px;border-radius:6px;padding:8px 10px;margin-top:10px}
+.note.warn{background:var(--warn-bg);color:var(--warn-fg)}
+.note.ok{background:var(--ok-bg);color:var(--ok-fg)}
+details{font-size:12px;color:var(--muted);margin-top:8px}
+details table{border-collapse:collapse;width:100%;margin-top:6px}
+details td,details th{border:1px solid var(--line);padding:3px 5px;text-align:left;vertical-align:top}
+
+.sec-title{display:flex;align-items:center;gap:10px;margin:28px 0 10px;font-weight:700}
+.sec-title:first-child{margin-top:0}
+.sec-title small{color:var(--muted);font-weight:400}
+.sec-title label{margin:0 0 0 auto;display:flex;gap:6px;align-items:center;color:var(--fg);font-size:12.5px}
+.sec-title input{width:auto}
+.wrap{position:relative;overflow:hidden;box-shadow:0 1px 3px rgba(0,0,0,.18);background:#fff}
+.wrap.off{opacity:.35}
+
+/* ───── 부착물 공통 (항상 흰 종이) ───── */
+.sheet{position:absolute;left:0;top:0;transform-origin:0 0;background:#fff;color:#000;font-family:var(--sans);overflow:hidden;
+  -webkit-print-color-adjust:exact;print-color-adjust:exact}
+.sheet *{box-sizing:border-box}
+.a4{width:210mm;height:297mm}
+.b63{width:600mm;height:300mm}
+.a3{width:297mm;height:420mm}
+.a4in{position:absolute;left:0;top:0;transform:scale(1.41421);transform-origin:0 0}
+.qbox{padding:2.4mm 5mm 3mm;border-bottom:1mm solid #000}
+.qbox .qt{font-size:5.2mm;font-weight:900;margin-bottom:2mm}
+.qbox .qt small{font-size:3.8mm;font-weight:500;margin-left:2mm}
+.qbox .qr{display:grid;grid-template-columns:1fr 1fr;gap:4mm}
+.qbox .cell{display:flex;border:.8mm solid #000;height:30mm}
+.qbox .cell span{width:25mm;flex:none;display:flex;flex-direction:column;align-items:center;justify-content:center;font-size:6mm;font-weight:900;line-height:1.2;border-right:.8mm solid #000}
+.qbox .cell span small{font-size:3.3mm;font-weight:500}
+.qbox .cell.full span{background:#000;color:#fff}
+.qbox .cell i{flex:1}
+.b64{width:600mm;height:450mm}
+
+/* CO2 / 안전수칙 A4 */
+.a4 .in{position:absolute;inset:9mm;border:1.6mm solid #000;display:flex;flex-direction:column}
+.a4 .head{display:flex;gap:6mm;align-items:center;justify-content:center;text-align:center;padding:3.5mm 6mm;border-bottom:1mm solid #000}
+.a4 .head svg{flex:none}
+.a4 .head h2{margin:0;font-size:16mm;line-height:1.1;font-weight:900;letter-spacing:-.3mm}
+.a4 .head .nm{font-size:6.2mm;font-weight:700;margin-top:1.5mm}
+.gas{text-align:center;padding:2.2mm 5mm 2.6mm;border-bottom:1mm solid #000}
+.gas .lb{font-size:.42em;font-weight:800;margin-right:.35em;vertical-align:.25em}
+.gas .gn{font-weight:900;line-height:1.1;letter-spacing:-.3mm;margin:.6mm 0 1.2mm}
+.gas .gs{font-size:5mm;font-weight:700}
+.gas .sig{margin:0 0 0 3mm;font-size:4.6mm}
+.sig{display:inline-block;margin-top:2mm;font-size:5.2mm;font-weight:900;border:.6mm solid #000;padding:.5mm 3mm}
+.band{background:#c8102e;color:#fff;font-weight:900;font-size:5.6mm;padding:2.6mm 5mm;text-align:center;letter-spacing:.1mm}
+.band.yel{background:#ffd200;color:#000}
+.kv{width:100%;border-collapse:collapse;font-size:4.3mm}
+.kv th,.kv td{border-bottom:.35mm solid #000;padding:1.9mm 3mm;text-align:left;vertical-align:middle}
+.kv th{width:36mm;background:#efefef;font-weight:700;border-right:.35mm solid #000}
+.kv td b{font-size:5mm}
+.qty{display:flex;align-items:center;gap:3mm;flex-wrap:wrap}
+.qty>span{border:.5mm solid #000;padding:1mm 3mm;font-weight:700}
+.qty .full{background:#000;color:#fff}
+.qty b{font-size:5.6mm;font-variant-numeric:tabular-nums}
+.qty .spec{border:0;font-weight:400;padding:0}
+.qty .blank{display:inline-block;width:10mm;border-bottom:.4mm solid currentColor;vertical-align:-1mm}
+.mgr{border-bottom:1mm solid #000}
+.mgr .co{font-size:9.5mm;font-weight:900;text-align:center;padding:1.6mm 4mm;border-bottom:.5mm solid #000;letter-spacing:.3mm}
+.mgr .pp{display:grid;grid-template-columns:1fr 1fr}
+.mgr .pp>div{padding:1.6mm 3mm 2mm;text-align:center}
+.mgr .pp>div+div{border-left:.5mm solid #000}
+.mgr .role{display:inline-block;font-size:4.2mm;font-weight:700;background:#000;color:#fff;padding:.4mm 3mm;border-radius:1mm}
+.mgr b{display:block;font-size:9mm;font-weight:900;line-height:1.2;margin-top:1mm}
+.mgr .ph{display:block;font-size:5.6mm;font-weight:700;font-variant-numeric:tabular-nums}
+.blk{padding:2.6mm 5mm 0}
+.tiles{display:grid;grid-template-columns:1fr 1fr;gap:.35em;font-size:5.2mm}
+.tile{display:flex;align-items:center;gap:.45em;border:.6mm solid #000;padding:.38em .55em;font-weight:800;line-height:1.2}
+.tile:last-child:nth-child(odd){grid-column:1/-1}
+.tile i{flex:none;width:.62em;height:.62em;border-radius:50%;background:#000}
+.tile.no{border-color:#c8102e;color:#c8102e}
+.tile.no i{background:#c8102e}
+.aidl{display:grid;gap:.3em;font-size:5mm}
+.aidl>div{display:flex;align-items:stretch;border:.6mm solid #000}
+.aidl b{flex:none;width:4em;background:#000;color:#fff;display:flex;align-items:center;justify-content:center;font-weight:800;padding:.3em 0}
+.aidl span{padding:.3em .6em;font-weight:700}
+.msds{margin:2mm 0 0;font-size:3.6mm;color:#333}
+.blk h3{margin:0 0 1.4mm;font-size:5.4mm;font-weight:900}
+.blk ol,.blk ul{margin:0;padding-left:5.5mm;font-size:4.5mm;line-height:1.45}
+.foot{margin-top:auto;display:flex;border-top:1mm solid #000}
+.foot div{flex:1;padding:2.6mm 4mm;font-size:4.2mm}
+.foot .em{background:#c8102e;color:#fff;font-weight:900;flex:none;width:52mm;text-align:center;font-size:7mm;display:flex;align-items:center;justify-content:center}
+.law{font-size:2.6mm;color:#333;padding:1.6mm 4mm;border-top:.35mm solid #000}
+
+/* 위험물 표지·게시판 */
+.plate{position:absolute;inset:0;border:5mm solid #000;display:flex;align-items:center;justify-content:center;font-weight:900;text-align:center;white-space:nowrap}
+.plate.red{background:#c8102e;color:#fff;border-color:#c8102e}
+.board{position:absolute;inset:0;border:5mm solid #000;display:flex;flex-direction:column;font-size:11mm}
+.board .top{display:flex;border-bottom:2mm solid #000}
+.board .top div{padding:5mm 9mm;font-weight:900;font-size:1.45em}
+.board .top div+div{border-left:2mm solid #000;font-size:.95em;font-weight:700;display:flex;align-items:center;margin-left:auto}
+.board table{width:100%;border-collapse:collapse}
+.board th,.board td{border-bottom:1mm solid #000;padding:2.5mm 5mm;text-align:center}
+.board th{background:#e9e9e9;font-size:.75em}
+.board td{font-variant-numeric:tabular-nums}
+.board td.l{text-align:left}
+.board .sum{margin-top:auto;display:grid;grid-template-columns:1.05fr 1fr 1fr;border-top:2mm solid #000}
+.board .sum>div{padding:4mm 6mm;border-left:1.5mm solid #000}
+.board .sum>div:first-child{border-left:0}
+.board .sum .k{font-size:.7em;font-weight:700}
+.board .sum .v{font-size:1.25em;font-weight:900;line-height:1.2}
+.board .sum .t{font-size:.8em;font-variant-numeric:tabular-nums}
+
+@media print{
+  @page a4{size:210mm 297mm;margin:0}
+  @page a3{size:297mm 420mm;margin:0}
+  @page b63{size:600mm 300mm;margin:0}
+  @page b64{size:600mm 450mm;margin:0}
+  body{background:#fff}
+  .form,.sec-title,.wrap.off{display:none!important}
+  .app{display:block}
+  .preview{padding:0}
+  .wrap{box-shadow:none;width:auto!important;height:auto!important;overflow:visible}
+  .sheet{position:relative;transform:none!important;break-after:page}
+  .sheet.a4{page:a4}.sheet.a3{page:a3}.b63{page:b63}.b64{page:b64}
+}
+</style>
+</head>
+<body>
+<div class="app">
+<aside class="form" id="form">
+  <h1>저장소 부착물 제작기</h1>
+  <p class="sub">이산화탄소 보관함 · 유류저장소 (산업안전보건법 / 위험물안전관리법)</p>
+  <div class="printbar">
+    <button class="primary" id="btnPrint" type="button">인쇄 / PDF 저장</button>
+    <button id="btnReset" type="button">예시값으로 초기화</button>
+  </div>
+
+  <fieldset>
+    <legend>공통</legend>
+    <label for="company">업체명</label><input id="company">
+    <label for="inhouse">사내 비상연락처</label><input id="inhouse">
+  </fieldset>
+
+  <fieldset>
+    <legend>가스 보관함</legend>
+    <label for="gas">가스 종류</label>
+    <select id="gas">
+      <option value="co2">이산화탄소 (CO₂)</option>
+      <option value="o2">산소 (O₂)</option>
+      <option value="lpg">LPG (액화석유가스)</option>
+      <option value="ar">아르곤 (Ar)</option>
+      <option value="n2">질소 (N₂)</option>
+      <option value="he">헬륨 (He)</option>
+      <option value="h2">수소 (H₂)</option>
+      <option value="c2h2">아세틸렌 (C₂H₂)</option>
+      <option value="custom">기타 (직접 입력)</option>
+    </select>
+    <div id="gasCustomBox" hidden>
+      <label for="gasName">품명</label><input id="gasName" placeholder="예: 아르곤·이산화탄소 혼합가스">
+      <label for="gasType">가스 성질</label>
+      <select id="gasType"><option value="inert">불연성·불활성</option><option value="flam">인화성(가연성)</option><option value="oxid">조연성(산화성)</option></select>
+    </div>
+    <label for="co2Place">설치 위치</label>
+    <select id="co2Place"><option value="out">옥외 (환기 양호)</option><option value="in">옥내 (실내·보관실)</option></select>
+    <div class="row2">
+      <div><label for="co2M1">관리책임자(정)</label><input id="co2M1"></div>
+      <div><label for="co2T1">연락처</label><input id="co2T1"></div>
+    </div>
+    <div class="row2">
+      <div><label for="co2M2">관리책임자(부)</label><input id="co2M2"></div>
+      <div><label for="co2T2">연락처</label><input id="co2T2"></div>
+    </div>
+  </fieldset>
+
+  <fieldset>
+    <legend>유류저장소</legend>
+    <label for="oilType">저장소 구분 (표지 문구)</label>
+    <select id="oilType">
+      <option>위험물 옥내저장소</option>
+      <option>위험물 옥외저장소</option>
+      <option>위험물 옥외탱크저장소</option>
+      <option>위험물 옥내탱크저장소</option>
+      <option>위험물 지하탱크저장소</option>
+      <option>위험물 간이탱크저장소</option>
+      <option>지정수량 미만 위험물 저장소</option>
+      <option value="custom">직접 입력</option>
+    </select>
+    <input id="oilTypeCustom" placeholder="표지 문구 직접 입력" hidden style="margin-top:6px">
+    <label for="oilLoc">저장소 위치</label><input id="oilLoc">
+    <div class="row2">
+      <div><label for="oilM1">위험물안전관리자(정)</label><input id="oilM1"></div>
+      <div><label for="oilT1">연락처</label><input id="oilT1"></div>
+    </div>
+    <div class="row2">
+      <div><label for="oilM2">대리자(부)</label><input id="oilM2"></div>
+      <div><label for="oilT2">연락처</label><input id="oilT2"></div>
+    </div>
+
+    <label style="margin-top:12px">저장 물질 (여러 개 가능)</label>
+    <div id="items"></div>
+    <button type="button" id="btnAdd" style="margin-top:8px;width:100%">+ 물질 추가</button>
+    <div id="calcNote"></div>
+
+    <details>
+      <summary>제4류 위험물 품명 · 지정수량 참고</summary>
+      <table>
+        <tr><th>품명</th><th>지정수량</th><th>예</th></tr>
+        <tr><td>특수인화물</td><td>50L</td><td>디에틸에테르, 이황화탄소</td></tr>
+        <tr><td>제1석유류 비수용성/수용성</td><td>200L / 400L</td><td>휘발유, 톨루엔, 벤젠 / 아세톤</td></tr>
+        <tr><td>알코올류</td><td>400L</td><td>메탄올, 에탄올, IPA</td></tr>
+        <tr><td>제2석유류 비수용성/수용성</td><td>1,000L / 2,000L</td><td>등유, 경유, 크실렌 / 아세트산</td></tr>
+        <tr><td>제3석유류 비수용성/수용성</td><td>2,000L / 4,000L</td><td>중유, 크레오소트유 / 에틸렌글리콜, 글리세린</td></tr>
+        <tr><td>제4석유류</td><td>6,000L</td><td>기어유, 실린더유 (인화점 200~250℃ 미만)</td></tr>
+        <tr><td>동식물유류</td><td>10,000L</td><td>아마인유, 들기름 등</td></tr>
+      </table>
+      <p>윤활유·엔진오일은 제품 MSDS의 인화점을 확인하세요. 인화점 250℃ 이상이면 위험물에서 제외됩니다.</p>
+    </details>
+  </fieldset>
+  <p class="sub">입력값은 이 브라우저에만 저장됩니다.</p>
+</aside>
+
+<main class="preview" id="preview"></main>
+</div>
+
+<script>
+const CATS = {
+  sp:  {label:'특수인화물', limit:50, grade:'Ⅰ'},
+  p1n: {label:'제1석유류(비수용성)', limit:200, grade:'Ⅱ'},
+  p1w: {label:'제1석유류(수용성)', limit:400, grade:'Ⅱ'},
+  al:  {label:'알코올류', limit:400, grade:'Ⅱ'},
+  p2n: {label:'제2석유류(비수용성)', limit:1000, grade:'Ⅲ'},
+  p2w: {label:'제2석유류(수용성)', limit:2000, grade:'Ⅲ'},
+  p3n: {label:'제3석유류(비수용성)', limit:2000, grade:'Ⅲ'},
+  p3w: {label:'제3석유류(수용성)', limit:4000, grade:'Ⅲ'},
+  p4:  {label:'제4석유류', limit:6000, grade:'Ⅲ'},
+  an:  {label:'동식물유류', limit:10000, grade:'Ⅲ'},
+  na:  {label:'위험물 아님(인화점 250℃ 이상 등)', limit:null, grade:'-'}
+};
+const DEFAULT = {
+  company:'(주)○○산업', inhouse:'안전관리팀 031-000-0000',
+  gas:'co2', gasName:'', gasType:'inert', co2Place:'out', co2Loc:'제1공장 동측 옥외 가스보관함', co2Spec:'20kg (47L)', co2Full:'3', co2Empty:'1',
+  co2M1:'홍길동', co2T1:'010-0000-0000', co2M2:'김철수', co2T2:'010-0000-0000',
+  oilType:'위험물 옥내저장소', oilTypeCustom:'', oilLoc:'제1공장 북측 유류창고',
+  oilM1:'이영희', oilT1:'010-0000-0000', oilM2:'박민수', oilT2:'010-0000-0000',
+  items:[
+    {name:'경유', cat:'p2n', qty:800},
+    {name:'휘발유', cat:'p1n', qty:40},
+    {name:'유압작동유', cat:'p3n', qty:200},
+    {name:'기어유', cat:'p4', qty:200}
+  ],
+  on:{co2:true, plate:true, fire:true, board:true, rules:true}
+};
+const FIELDS = ['company','inhouse','gas','gasName','gasType','co2Place','co2M1','co2T1','co2M2','co2T2','oilType','oilTypeCustom','oilLoc','oilM1','oilT1','oilM2','oilT2'];
+const KEY = 'storage-sign-maker-v1';
+let S;
+try { S = JSON.parse(localStorage.getItem(KEY)) } catch(e) {}
+S = Object.assign(structuredClone(DEFAULT), S || {});
+S.on = Object.assign({}, DEFAULT.on, S.on||{});
+const save = () => { try { localStorage.setItem(KEY, JSON.stringify(S)) } catch(e) {} };
+const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+const num = n => Number(n||0).toLocaleString('ko-KR');
+const $ = id => document.getElementById(id);
+const cnt = v => (v === '' || v == null) ? '<span class="blank"></span>' : esc(v);
+
+/* ───── 그림 표지 (SVG) ───── */
+const FLAME = 'M50 22c4 10 15 17 15 32 0 11-7 19-15 19s-15-8-15-18c0-8 5-12 7-18 2 5 4 8 7 9-1-9 0-16 1-24z';
+const svgGHS04 = s => `<svg width="${s}mm" height="${s}mm" viewBox="0 0 100 100"><rect x="17" y="17" width="66" height="66" transform="rotate(45 50 50)" fill="#fff" stroke="#e30613" stroke-width="7"/><rect x="26" y="46" width="38" height="15" rx="7.5" fill="#000"/><rect x="63" y="49.5" width="6" height="8" fill="#000"/><rect x="68.5" y="47" width="5" height="13" rx="1" fill="#000"/></svg>`;
+const svgFlammable = s => `<svg width="${s}mm" height="${s}mm" viewBox="0 0 100 100"><rect x="17" y="17" width="66" height="66" transform="rotate(45 50 50)" fill="#fff" stroke="#e30613" stroke-width="7"/><path d="${FLAME}" transform="translate(0 -2) scale(1) " fill="#000"/><rect x="33" y="72" width="34" height="4" fill="#000"/></svg>`;
+const svgNoFire = s => `<svg width="${s}mm" height="${s}mm" viewBox="0 0 100 100"><circle cx="50" cy="50" r="42" fill="#fff" stroke="#e30613" stroke-width="9"/><path d="${FLAME}" transform="translate(0 3)" fill="#000"/><line x1="21" y1="21" x2="79" y2="79" stroke="#e30613" stroke-width="9"/></svg>`;
+
+function mgrBlock(n1,t1,n2,t2){
+  return `<div class="mgr">
+    <div class="co">${esc(S.company)}</div>
+    <div class="pp">
+      <div><span class="role">관리책임자 (정)</span><b>${esc(n1)}</b><span class="ph">☎ ${esc(t1)}</span></div>
+      <div><span class="role">관리책임자 (부)</span><b>${esc(n2)}</b><span class="ph">☎ ${esc(t2)}</span></div>
+    </div></div>`;
+}
+
+const H280 = 'H280 고압가스 포함; 가열하면 폭발할 수 있음';
+const GASES = {
+  co2:  {name:'이산화탄소', sub:'CO₂ · 액화가스 · 불연성', cas:'124-38-9', un:'1013', type:'inert', heavy:true, liq:true, color:'청색', h:[H280]},
+  o2:   {name:'산소', sub:'O₂ · 압축가스 · 조연성(산화성)', cas:'7782-44-7', un:'1072', type:'oxid', color:'녹색', h:['H270 화재를 일으키거나 강렬하게 함; 산화제', H280]},
+  lpg:  {name:'LPG (액화석유가스)', sub:'프로판·부탄 · 액화가스 · 인화성', cas:'68476-85-7', un:'1075', type:'flam', heavy:true, liq:true, upright:true, color:'회색', law:'액화석유가스의 안전관리 및 사업법', h:['H220 극인화성 가스', H280]},
+  ar:   {name:'아르곤', sub:'Ar · 압축가스 · 불활성', cas:'7440-37-1', un:'1006', type:'inert', heavy:true, color:'회색', h:[H280]},
+  n2:   {name:'질소', sub:'N₂ · 압축가스 · 불활성', cas:'7727-37-9', un:'1066', type:'inert', color:'회색', h:[H280]},
+  he:   {name:'헬륨', sub:'He · 압축가스 · 불활성', cas:'7440-59-7', un:'1046', type:'inert', color:'회색', h:[H280]},
+  h2:   {name:'수소', sub:'H₂ · 압축가스 · 인화성', cas:'1333-74-0', un:'1049', type:'flam', color:'주황색', h:['H220 극인화성 가스', H280]},
+  c2h2: {name:'아세틸렌', sub:'C₂H₂ · 용해가스 · 인화성', cas:'74-86-2', un:'1001', type:'flam', upright:true, color:'황색', h:['H220 극인화성 가스', 'H230 공기가 없어도 폭발적으로 반응할 수 있음', H280]}
+};
+const TYPE_LABEL = {inert:'불연성·불활성', flam:'인화성(가연성)', oxid:'조연성(산화성)'};
+function gasInfo(){
+  if (S.gas !== 'custom') return GASES[S.gas] || GASES.co2;
+  return {name:S.gasName || '(품명 입력)', sub:TYPE_LABEL[S.gasType] + ' 가스', type:S.gasType, custom:true};
+}
+const textLen = t => [...t].reduce((n,c) => n + (/[ㄱ-힣]/.test(c) ? 1 : 0.62), 0);
+
+function sheetCO2(){
+  const g = gasInfo(), inside = S.co2Place === 'in';
+  const signal = g.type === 'inert' ? '경 고' : '위 험';
+  const nameFs = Math.min(22, 172 / Math.max(1, textLen(g.name) + 1.5));
+
+  let band;
+  if (g.type === 'flam') band = '<div class="band">화기엄금 · 인화성 가스 ─ 누출 시 점화원 제거 후 환기</div>';
+  else if (g.type === 'oxid') band = '<div class="band">화기엄금 · 기름 접촉 금지 ─ 가연물과 분리 보관</div>';
+  else if (inside) band = '<div class="band">질식 위험 ─ 누출 시 즉시 대피·환기, 밀폐된 곳은 산소농도 측정 후 출입</div>';
+  else band = '<div class="band yel">직사광선 차단 · 용기 온도 40℃ 이하 유지 · 넘어짐 방지</div>';
+
+  const extra = [];
+  if (g.type === 'inert' && inside) extra.push('고농도 흡입 시 산소결핍·질식');
+  if (g.liq) extra.push('액체·저온가스 접촉 시 동상');
+  const hazard = g.custom
+    ? `${TYPE_LABEL[g.type]} 고압가스 — 유해·위험문구는 제품 물질안전보건자료(MSDS) 참조`
+    : g.h.map(h => h.replace(/^(H\d+)/, '<b>$1</b>')).join('<br>') + (extra.length ? '<br>' + extra.join(' / ') : '');
+
+  // 수칙: [금지 여부, 짧은 문구]
+  const tips = [];
+  tips.push([false, '40℃ 이하 보관 · 직사광선 차단']);
+  tips.push([false, g.upright ? '반드시 세워서 고정' : '넘어짐 방지 고정']);
+  tips.push([false, '운반 시 캡 · 밸브는 천천히']);
+  tips.push([false, '실병 · 공병 구분 보관']);
+  if (g.type === 'flam') {
+    tips.push([false, '산소 용기와 분리 보관']);
+    tips.push([true,  '불꽃으로 누설 확인 금지']);
+    if (inside) tips.push([false, '가스누설경보기 · 방폭설비']);
+  } else if (g.type === 'oxid') {
+    tips.push([true,  '기름 · 그리스 접촉 금지']);
+    tips.push([false, '가연물과 분리 보관']);
+  } else {
+    tips.push([true,  '화기 근처 보관 금지']);
+    if (inside) tips.push([false, '보관실 상시 환기']);
+  }
+  if (g.heavy && !inside) tips.push([true, '맨홀 · 피트 등 저지대 진입 금지']);
+  tips.push([false, '사용 전 용기 · 밸브 점검']);
+  tips.push([true,  '관계자 외 취급 금지']);
+
+  // 응급조치: [상황, 조치]
+  const aid = [];
+  if (g.type === 'flam') {
+    aid.push(['누출', '밸브 잠금 → 점화원 제거 → 환기']);
+    aid.push(['화재', '누출을 못 막으면 끄지 말고 대피 → 119']);
+  } else if (g.type === 'oxid') {
+    aid.push(['누출', '밸브 잠금 → 가연물 치우기 → 환기']);
+    aid.push(['착화', '바닥에 구르거나 물로 끄기 → 119']);
+  } else {
+    aid.push(['흡입', '신선한 공기로 이동 → 119']);
+    if (inside) aid.push(['구조', '호흡보호구 착용 후 진입']);
+  }
+  if (g.liq) aid.push(['동상', '문지르지 말고 미지근한 물로']);
+
+  return `<div class="sheet a3"><div class="a4 a4in"><div class="in">
+    ${mgrBlock(S.co2M1,S.co2T1,S.co2M2,S.co2T2)}
+    <div class="gas">
+      <div class="gn" style="font-size:${nameFs}mm"><span class="lb">제품명</span>${esc(g.name)}</div>
+      <div class="gs">${esc(g.sub)}<span class="sig">신호어 : ${signal}</span></div>
+    </div>
+    ${band}
+    <table class="kv">
+      ${g.custom ? '' : `<tr><th>CAS No.</th><td>${g.cas}</td></tr>`}
+      <tr><th>유해·위험성</th><td>${hazard}</td></tr>
+    </table>
+    <div class="qbox">
+      <div class="qt">보관수량</div>
+      <div class="qr">
+        <div class="cell full"><span>실 병<small>충전 용기</small></span><i></i></div>
+        <div class="cell"><span>공 병<small>빈 용기</small></span><i></i></div>
+      </div>
+    </div>
+    <div class="blk"><h3>취급 · 보관 수칙</h3>
+      <div class="tiles">${tips.map(([no, t]) => `<div class="tile${no ? ' no' : ''}"><i></i>${t}</div>`).join('')}</div>
+    </div>
+    <div class="blk"><h3>응급조치</h3>
+      <div class="aidl">${aid.map(([k, v]) => `<div><b>${k}</b><span>${v}</span></div>`).join('')}</div>
+      <p class="msds">자세한 내용은 비치된 물질안전보건자료(MSDS)를 확인하세요.</p>
+    </div>
+  </div></div></div>`;
+}
+
+function plateText(){ return S.oilType === 'custom' ? (S.oilTypeCustom || '위험물 저장소') : S.oilType; }
+function sheetPlate(){
+  const t = plateText();
+  const fs = Math.min(62, 540 / Math.max(1, [...t].length));
+  return `<div class="sheet b63"><div class="plate" style="font-size:${fs}mm">${esc(t)}</div></div>`;
+}
+function sheetFire(){
+  return `<div class="sheet b63"><div class="plate red" style="font-size:130mm;letter-spacing:12mm;padding-left:12mm">화기엄금</div></div>`;
+}
+
+function calc(){
+  const rows = S.items.filter(i => CATS[i.cat] && CATS[i.cat].limit);
+  let total = 0;
+  rows.forEach(i => { total += (Number(i.qty)||0) / CATS[i.cat].limit; });
+  return {rows, total};
+}
+const fmtX = x => (Math.round(x*100)/100).toLocaleString('ko-KR',{maximumFractionDigits:2});
+
+function sheetBoard(){
+  const {rows,total} = calc();
+  const n = Math.max(rows.length,1);
+  const fs = n <= 4 ? 15 : n <= 6 ? 12.5 : n <= 8 ? 10 : 8;
+  const body = rows.length ? rows.map(i => {
+    const c = CATS[i.cat];
+    return `<tr><td class="l">${esc(c.label)}</td><td class="l"><b>${esc(i.name)}</b></td><td>${c.grade}</td><td>${num(i.qty)} L</td><td>${num(c.limit)} L</td><td>${fmtX((Number(i.qty)||0)/c.limit)}</td></tr>`;
+  }).join('') : `<tr><td colspan="6">저장 물질을 입력하세요</td></tr>`;
+  return `<div class="sheet b64"><div class="board" style="font-size:${fs}mm">
+    <div class="top"><div>유별 : 제4류 위험물 (인화성 액체)</div><div>${esc(S.company)}</div></div>
+    <table><tr><th>품 명</th><th>물질명</th><th>위험등급</th><th>저장최대수량</th><th>지정수량</th><th>배수</th></tr>${body}</table>
+    <div class="sum">
+      <div><div class="k">지정수량의 배수 (합계)</div><div class="v">${fmtX(total)} 배</div></div>
+      <div><div class="k">위험물안전관리자 (정)</div><div class="v">${esc(S.oilM1)}</div><div class="t">${esc(S.oilT1)}</div></div>
+      <div><div class="k">대리자 (부)</div><div class="v">${esc(S.oilM2)}</div><div class="t">${esc(S.oilT2)}</div></div>
+    </div></div></div>`;
+}
+
+function sheetRules(){
+  const list = S.items.map(i => `${esc(i.name)} (${esc(CATS[i.cat]?.label||'')}, ${num(i.qty)}L)`).join(' · ');
+  return `<div class="sheet a4"><div class="in">
+    <div class="head">
+      <div><h2>유류저장소</h2><div class="nm">관계자 외 출입금지</div><span class="sig">신호어 : 위 험</span></div></div>
+    <div class="band">화기 · 흡연 · 점화원 반입 금지 &nbsp;|&nbsp; 인화성 액체 경고</div>
+    ${mgrBlock(S.oilM1,S.oilT1,S.oilM2,S.oilT2)}
+    <table class="kv">
+      <tr><th>저장소 위치</th><td>${esc(S.oilLoc)}</td></tr>
+      <tr><th>저장 물질</th><td style="font-size:3.8mm">${list || '-'}</td></tr>
+    </table>
+    <div class="blk"><h3>안전 수칙</h3><ol>
+      <li>저장소 내 및 주변에서 흡연·화기 사용 금지, 불꽃·스파크가 생기는 공구 사용 금지</li>
+      <li>용기는 항상 밀폐하고, 옮겨 담을 때는 접지하여 정전기를 방지할 것</li>
+      <li>저장소는 상시 환기하고, 저장 물질별로 구분·표시하여 보관할 것</li>
+      <li>누유 시 흡착포·모래로 확산을 막고 하수구·배수로 유입을 차단할 것</li>
+      <li>소화기 등 소화설비 위치를 확인하고 통로에 물건을 두지 말 것</li>
+      <li>저장 물질의 물질안전보건자료(MSDS)를 게시·비치하고 취급자에게 교육할 것</li>
+      <li>보호구(내화학 장갑, 보안경)를 착용하고 취급할 것</li>
+    </ol></div>
+    <div class="blk"><h3>화재 · 누출 시</h3><ul>
+      <li>즉시 주변에 알리고 119 신고, 초기 화재는 분말·이산화탄소·포 소화기로 진화 (물 직접 주수 금지)</li>
+      <li>피부 접촉 시 오염된 옷을 벗고 물과 비누로 씻을 것, 눈에 들어가면 15분 이상 흐르는 물로 세척</li>
+    </ul></div>
+    <div class="foot"><div class="em">☎ 119</div><div><b>사내 비상연락</b><br>${esc(S.inhouse)}</div></div>
+    <div class="law">근거: 산업안전보건법 제37조(안전보건표지)·제114조(MSDS 게시)·시행규칙 별표 6·7, 위험물안전관리법 시행규칙 별표 4 Ⅲ(표지 및 게시판)</div>
+  </div></div>`;
+}
+
+const SHEETS = [
+  {id:'co2',  title:'① 가스 보관함 부착물', size:'A3 (297×420mm)', w:297, h:420, fn:sheetCO2},
+  {id:'plate',title:'② 유류저장소 표지', size:'600×300mm · 백색바탕 흑색문자', w:600, h:300, fn:sheetPlate},
+  {id:'fire', title:'③ 주의사항 게시판', size:'600×300mm · 적색바탕 백색문자', w:600, h:300, fn:sheetFire},
+  {id:'board',title:'④ 위험물 게시판', size:'600×450mm · 유별·품명·최대수량·배수·안전관리자', w:600, h:450, fn:sheetBoard},
+  {id:'rules',title:'⑤ 유류저장소 안전수칙', size:'A4 (210×297mm) · 산안법 표지', w:210, h:297, fn:sheetRules}
+];
+const MM = 96/25.4;
+
+function render(){
+  const pv = $('preview');
+  pv.innerHTML = SHEETS.map(s => `
+    <div class="sec-title">${s.title} <small>${s.size}</small>
+      <label><input type="checkbox" data-on="${s.id}" ${S.on[s.id]?'checked':''}> 인쇄</label></div>
+    <div class="wrap ${S.on[s.id]?'':'off'}" data-w="${s.w}" data-h="${s.h}">${s.fn()}</div>`).join('');
+  fit();
+  shrinkToFit();
+  const {rows,total} = calc();
+  const note = $('calcNote');
+  if (!rows.length) { note.innerHTML=''; return; }
+  note.innerHTML = total >= 1
+    ? `<div class="note ok">지정수량 배수 합계 <b>${fmtX(total)}배</b> — 지정수량 이상입니다. 저장소 설치허가와 위험물안전관리자 선임 대상입니다 (위험물안전관리법 제6조·제15조).</div>`
+    : `<div class="note warn">지정수량 배수 합계 <b>${fmtX(total)}배</b> — 지정수량 미만(소량위험물)입니다. 시·도 위험물 안전관리 조례가 적용되므로 표지 문구와 규격을 관할 소방서 기준으로 확인하세요.</div>`;
+}
+// A4 부착물 내용이 넘치면 수칙 글자를 조금씩 줄여 한 장에 맞춘다
+function shrinkToFit(){
+  document.querySelectorAll('.a4 .in').forEach(box => {
+    const els = [...box.querySelectorAll('.blk ol, .blk ul, .tiles, .aidl')];
+    const base = els.map(e => parseFloat(getComputedStyle(e).fontSize));
+    for (let k = 0.98; box.scrollHeight > box.clientHeight && k > 0.55; k -= 0.02)
+      els.forEach((e, n) => { e.style.fontSize = base[n] * k + 'px'; });
+  });
+}
+function fit(){
+  const pv = $('preview');
+  const avail = pv.clientWidth - parseFloat(getComputedStyle(pv).paddingLeft) - parseFloat(getComputedStyle(pv).paddingRight);
+  pv.querySelectorAll('.wrap').forEach(w => {
+    const W = w.dataset.w*MM, H = w.dataset.h*MM;
+    const sc = Math.min(1, avail / W, w.dataset.w > 300 ? 1 : 0.9);
+    w.style.width = W*sc + 'px'; w.style.height = H*sc + 'px';
+    w.firstElementChild.style.transform = `scale(${sc})`;
+  });
+}
+
+function renderItems(){
+  const opts = Object.entries(CATS).map(([k,c]) => `<option value="${k}">${c.label}${c.limit?` · ${num(c.limit)}L`:''}</option>`).join('');
+  $('items').innerHTML = S.items.map((it,i) => `
+    <div class="item">
+      <button type="button" class="del" data-del="${i}" aria-label="삭제">삭제</button>
+      <div class="row2">
+        <div><label for="in${i}">물질명</label><input id="in${i}" data-i="${i}" data-k="name" value="${esc(it.name)}"></div>
+        <div><label for="iq${i}">최대저장수량 (L)</label><input id="iq${i}" type="number" min="0" data-i="${i}" data-k="qty" value="${esc(it.qty)}"></div>
+      </div>
+      <label for="ic${i}">품명</label><select id="ic${i}" data-i="${i}" data-k="cat">${opts}</select>
+    </div>`).join('');
+  S.items.forEach((it,i) => { $('ic'+i).value = it.cat; });
+}
+function loadForm(){
+  FIELDS.forEach(f => { $(f).value = S[f] ?? ''; });
+  $('oilTypeCustom').hidden = S.oilType !== 'custom';
+  $('gasCustomBox').hidden = S.gas !== 'custom';
+  renderItems();
+}
+
+$('form').addEventListener('input', e => {
+  const t = e.target;
+  if (t.dataset.k) { const it = S.items[t.dataset.i]; it[t.dataset.k] = t.dataset.k==='qty' ? Number(t.value) : t.value; }
+  else if (FIELDS.includes(t.id)) { S[t.id] = t.value; if (t.id==='oilType') $('oilTypeCustom').hidden = t.value!=='custom'; if (t.id==='gas') $('gasCustomBox').hidden = t.value!=='custom'; }
+  save(); render();
+});
+$('form').addEventListener('click', e => {
+  if (e.target.dataset.del !== undefined) { S.items.splice(+e.target.dataset.del,1); renderItems(); save(); render(); }
+});
+$('btnAdd').onclick = () => { S.items.push({name:'', cat:'p2n', qty:0}); renderItems(); save(); render(); };
+$('btnReset').onclick = () => { S = structuredClone(DEFAULT); save(); loadForm(); render(); };
+$('btnPrint').onclick = () => window.print();
+$('preview').addEventListener('change', e => {
+  if (e.target.dataset.on) { S.on[e.target.dataset.on] = e.target.checked; save(); render(); }
+});
+window.addEventListener('resize', fit);
+loadForm(); render();
+document.fonts?.ready.then(render);
+</script>
+</body>
+</html>
