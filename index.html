@@ -315,7 +315,7 @@ Object.values(CATS).forEach(c => { c.unit ||= 'L'; c.cls ||= '제4류'; });
 const CLS_LABEL = {'제4류':'제4류 (인화성 액체)', '제2류':'제2류 (가연성 고체)'};
 
 /* ───── chemicare 화학물질 목록 (GitHub Actions가 주기적으로 갱신) ───── */
-const CHEM_URLS = ['https://raw.githubusercontent.com/2022sk/storage-signs/main/chemicals.enc.json', 'chemicals.enc.json'];
+const CHEM_URLS = ['https://raw.githubusercontent.com/2022sk/signs/main/chemicals.enc.json', 'chemicals.enc.json'];
 let CHEM = null;
 const chemById = id => CHEM && id != null ? CHEM.byId[id] : null;
 const itemName = it => chemById(it.cid)?.name || it.name;
