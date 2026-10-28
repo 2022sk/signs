@@ -27,6 +27,8 @@ body{background:var(--bg);color:var(--fg);font-family:var(--sans);font-size:14px
 .lock-box .primary{margin-top:14px;padding:9px}
 .lock-box .chk{display:flex;gap:6px;align-items:center;margin-top:10px;color:var(--fg)}
 .lock-box .chk input{width:auto}
+/* 나눔스퀘어에는 암호 가림 기호(●)가 없어 입력해도 안 보이므로 시스템 글꼴을 쓴다 */
+#lockPw{font-family:Arial,"Malgun Gothic",sans-serif;letter-spacing:.15em}
 .lock-msg{min-height:1.4em;margin:8px 0 0;font-size:12.5px;color:var(--muted)}
 .app{display:grid;grid-template-columns:minmax(320px,420px) 1fr;min-height:100vh}
 .form{background:var(--panel);border-right:1px solid var(--line);padding:20px 18px 60px;overflow:auto;max-height:100vh;position:sticky;top:0}
