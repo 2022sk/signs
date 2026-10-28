@@ -159,7 +159,10 @@ details td,details th{border:1px solid var(--line);padding:3px 5px;text-align:le
 .board th{background:#e9e9e9;font-size:.75em}
 .board td{font-variant-numeric:tabular-nums}
 .board td.l{text-align:left}
-.board .sum{margin-top:auto;display:grid;grid-template-columns:1.05fr 1fr 1fr;border-top:2mm solid #000}
+.board .w{width:22%;border-left:1mm solid #000}
+.board td.w{height:2em;text-align:right;vertical-align:bottom;padding-bottom:1.5mm}
+.board td.w span{font-size:.6em;font-weight:700}
+.board .sum{margin-top:auto;display:grid;grid-template-columns:1fr 1fr;border-top:2mm solid #000}
 .board .sum>div{padding:4mm 6mm;border-left:1.5mm solid #000}
 .board .sum>div:first-child{border-left:0}
 .board .sum .k{font-size:.7em;font-weight:700}
@@ -582,18 +585,17 @@ function calc(){
 const fmtX = x => (Math.round(x*100)/100).toLocaleString('ko-KR',{maximumFractionDigits:2});
 
 function sheetBoard(){
-  const {rows,total} = calc();
+  const {rows} = calc();
   const n = Math.max(rows.length,1);
   const fs = n <= 4 ? 15 : n <= 6 ? 12.5 : n <= 8 ? 10 : 8;
   const body = rows.length ? rows.map(i => {
     const c = CATS[i.cat];
-    return `<tr><td class="l">${esc(c.label)}</td><td class="l"><b>${esc(itemName(i))}</b></td><td>${c.grade}</td><td>${num(i.qty)} ${c.unit}</td><td>${num(c.limit)} ${c.unit}</td><td>${fmtX((Number(i.qty)||0)/c.limit)}</td></tr>`;
+    return `<tr><td class="l">${c.cls} ${esc(c.label)}</td><td class="l"><b>${esc(itemName(i))}</b></td><td>${num(i.qty)} ${c.unit}</td><td>${num(c.limit)} ${c.unit}</td><td>${fmtX((Number(i.qty)||0)/c.limit)}</td><td class="w"><span>${c.unit}</span></td></tr>`;
   }).join('') : `<tr><td colspan="6">저장 물질을 입력하세요</td></tr>`;
   return `<div class="sheet b64"><div class="board" style="font-size:${fs}mm">
-    <div class="top"><div>유별 : ${[...new Set(rows.map(i => CATS[i.cat].cls))].map(k => CLS_LABEL[k]).join(' · ') || '-'}</div><div>${esc(S.company)}</div></div>
-    <table><tr><th>품 명</th><th>물질명</th><th>위험등급</th><th>저장최대수량</th><th>지정수량</th><th>배수</th></tr>${body}</table>
+    <div class="top"><div>보관 목록</div><div>${esc(S.company)}</div></div>
+    <table><tr><th>위험물 분류</th><th>물질명</th><th>저장최대수량</th><th>지정수량</th><th>배수</th><th class="w">보관 수량</th></tr>${body}</table>
     <div class="sum">
-      <div><div class="k">지정수량의 배수 (합계)</div><div class="v">${fmtX(total)} 배</div></div>
       <div><div class="k">위험물안전관리자 (정)</div><div class="v">${esc(S.oilM1)}</div><div class="t">${esc(S.oilT1)}</div></div>
       <div><div class="k">대리자 (부)</div><div class="v">${esc(S.oilM2)}</div><div class="t">${esc(S.oilT2)}</div></div>
     </div></div></div>`;
