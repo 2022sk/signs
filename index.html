@@ -586,15 +586,17 @@ const fmtX = x => (Math.round(x*100)/100).toLocaleString('ko-KR',{maximumFractio
 
 function sheetBoard(){
   const {rows} = calc();
-  const n = Math.max(rows.length,1);
-  const fs = n <= 4 ? 15 : n <= 6 ? 12.5 : n <= 8 ? 10 : 8;
+  const n = rows.length + Math.max(2, 4 - rows.length);
+  const fs = n <= 4 ? 14 : n <= 6 ? 12 : n <= 8 ? 10 : n <= 10 ? 8.5 : 7;
   const body = rows.length ? rows.map(i => {
     const c = CATS[i.cat];
     return `<tr><td class="l">${c.cls} ${esc(c.label)}</td><td class="l"><b>${esc(itemName(i))}</b></td><td>${num(i.qty)} ${c.unit}</td><td>${num(c.limit)} ${c.unit}</td><td>${fmtX((Number(i.qty)||0)/c.limit)}</td><td class="w"><span>${c.unit}</span></td></tr>`;
-  }).join('') : `<tr><td colspan="6">저장 물질을 입력하세요</td></tr>`;
+  }).join('') : '';
+  // 목록 아래 빈 줄: 추가 화학물질을 손으로 적는 칸
+  const blank = '<tr class="blank"><td></td><td></td><td></td><td></td><td></td><td class="w"></td></tr>'.repeat(Math.max(2, 4 - rows.length));
   return `<div class="sheet b64"><div class="board" style="font-size:${fs}mm">
     <div class="top"><div>보관 목록</div><div>${esc(S.company)}</div></div>
-    <table><tr><th>위험물 분류</th><th>물질명</th><th>저장최대수량</th><th>지정수량</th><th>배수</th><th class="w">보관 수량</th></tr>${body}</table>
+    <table><tr><th>위험물 분류</th><th>물질명</th><th>저장최대수량</th><th>지정수량</th><th>배수</th><th class="w">보관 수량</th></tr>${body}${blank}</table>
     <div class="sum">
       <div><div class="k">위험물안전관리자 (정)</div><div class="v">${esc(S.oilM1)}</div><div class="t">${esc(S.oilT1)}</div></div>
       <div><div class="k">대리자 (부)</div><div class="v">${esc(S.oilM2)}</div><div class="t">${esc(S.oilT2)}</div></div>
@@ -653,12 +655,17 @@ const MM = 96/25.4;
 
 function render(){
   const pv = $('preview');
+  // 다시 그리는 동안 높이가 잠깐 줄어 맨 위로 튀지 않도록 스크롤 위치를 지킨다
+  const y = window.scrollY;
+  pv.style.minHeight = pv.offsetHeight + 'px';
   pv.innerHTML = SHEETS.map(s => `
     <div class="sec-title">${s.title} <small>${s.size}</small>
       <label><input type="checkbox" data-on="${s.id}" ${S.on[s.id]?'checked':''}> 인쇄</label></div>
     <div class="wrap ${S.on[s.id]?'':'off'}" data-w="${s.w}" data-h="${s.h}">${s.fn()}</div>`).join('');
   fit();
   shrinkToFit();
+  pv.style.minHeight = '';
+  window.scrollTo(0, y);
   const {rows,total} = calc();
   const note = $('calcNote');
   if (!rows.length) { note.innerHTML=''; return; }
