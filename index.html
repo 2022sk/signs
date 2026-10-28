@@ -139,6 +139,8 @@ details td,details th{border:1px solid var(--line);padding:3px 5px;text-align:le
 .stab th,.stab td{border-bottom:.35mm solid #000;padding:1.6mm 4mm;text-align:left}
 .stab th{background:#efefef;font-size:.85em}
 .stab .r{text-align:right;font-variant-numeric:tabular-nums}
+.stab td.w{border-left:.35mm solid #000;vertical-align:bottom;padding-bottom:.8mm;height:2.2em}
+.stab td.w span{font-size:.7em;font-weight:700}
 .msds{margin:2mm 0 0;font-size:3.6mm;color:#333}
 .blk h3{margin:0 0 1.4mm;font-size:5.4mm;font-weight:900}
 .blk ol,.blk ul{margin:0;padding-left:5.5mm;font-size:4.5mm;line-height:1.45}
@@ -159,7 +161,7 @@ details td,details th{border:1px solid var(--line);padding:3px 5px;text-align:le
 .board th{background:#e9e9e9;font-size:.75em}
 .board td{font-variant-numeric:tabular-nums}
 .board td.l{text-align:left}
-.board .w{width:22%;border-left:1mm solid #000}
+.board .w{width:28%;border-left:1mm solid #000}
 .board td.w{height:2em;text-align:right;vertical-align:bottom;padding-bottom:1.5mm}
 .board td.w span{font-size:.6em;font-weight:700}
 .board .sum{margin-top:auto;display:grid;grid-template-columns:1fr 1fr;border-top:2mm solid #000}
@@ -590,13 +592,13 @@ function sheetBoard(){
   const fs = n <= 4 ? 14 : n <= 6 ? 12 : n <= 8 ? 10 : n <= 10 ? 8.5 : 7;
   const body = rows.length ? rows.map(i => {
     const c = CATS[i.cat];
-    return `<tr><td class="l">${c.cls} ${esc(c.label)}</td><td class="l"><b>${esc(itemName(i))}</b></td><td>${num(i.qty)} ${c.unit}</td><td>${num(c.limit)} ${c.unit}</td><td>${fmtX((Number(i.qty)||0)/c.limit)}</td><td class="w"><span>${c.unit}</span></td></tr>`;
+    return `<tr><td class="l">${c.cls} ${esc(c.label)}</td><td class="l"><b>${esc(itemName(i))}</b></td><td>${num(c.limit)} ${c.unit}</td><td class="w"><span>${c.unit}</span></td></tr>`;
   }).join('') : '';
   // 목록 아래 빈 줄: 추가 화학물질을 손으로 적는 칸
-  const blank = '<tr class="blank"><td></td><td></td><td></td><td></td><td></td><td class="w"></td></tr>'.repeat(Math.max(2, 4 - rows.length));
+  const blank = '<tr class="blank"><td></td><td></td><td></td><td class="w"></td></tr>'.repeat(Math.max(2, 4 - rows.length));
   return `<div class="sheet b64"><div class="board" style="font-size:${fs}mm">
     <div class="top"><div>보관 목록</div><div>${esc(S.company)}</div></div>
-    <table><tr><th>위험물 분류</th><th>물질명</th><th>저장최대수량</th><th>지정수량</th><th>배수</th><th class="w">보관 수량</th></tr>${body}${blank}</table>
+    <table><tr><th>위험물 분류</th><th>물질명</th><th>지정수량</th><th class="w">보관 수량</th></tr>${body}${blank}</table>
     <div class="sum">
       <div><div class="k">위험물안전관리자 (정)</div><div class="v">${esc(S.oilM1)}</div><div class="t">${esc(S.oilT1)}</div></div>
       <div><div class="k">대리자 (부)</div><div class="v">${esc(S.oilM2)}</div><div class="t">${esc(S.oilT2)}</div></div>
@@ -622,7 +624,7 @@ function sheetRules(){
     ['눈', '흐르는 물로 15분 이상 씻기']
   ];
   const rows = S.items.filter(i => i.name || i.qty).map(i =>
-    `<tr><td><b>${esc(itemName(i))}</b></td><td>${esc(CATS[i.cat]?.label || '')}</td><td class="r">${num(i.qty)} ${CATS[i.cat]?.unit || 'L'}</td></tr>`).join('');
+    `<tr><td><b>${esc(itemName(i))}</b></td><td>${esc(CATS[i.cat]?.label || '')}</td><td class="r w"><span>${CATS[i.cat]?.unit || 'L'}</span></td></tr>`).join('');
   return `<div class="sheet a3"><div class="a4 a4in"><div class="in">
     ${mgrBlock(S.oilM1,S.oilT1,S.oilM2,S.oilT2)}
     <div class="gas">
@@ -631,7 +633,7 @@ function sheetRules(){
     </div>
     <div class="band">화기엄금 · 흡연금지 · 점화원 반입금지</div>
     <table class="stab">
-      <tr><th>물질명</th><th>품명</th><th class="r">최대저장량</th></tr>
+      <tr><th>물질명</th><th>품명</th><th class="r" style="width:30%">보관 수량</th></tr>
       ${rows || '<tr><td colspan="3">저장 물질을 입력하세요</td></tr>'}
     </table>
     <div class="blk"><h3>취급 · 보관 수칙</h3>
